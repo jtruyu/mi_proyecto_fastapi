@@ -12,34 +12,31 @@ async def connect_db():
 
 @app.get("/simulacro/{num_preguntas}")
 async def get_simulacro(num_preguntas: int):
-    conn = await connect_db()
-
-    # Obtener preguntas aleatorias de la tabla Física_prácticas_cepreuni
-    ejercicios = await conn.fetch(
-        "SELECT Ejercicio, Imagen, A, B, C, D, E, Alt_Correcta, Tema, Subtema, Dificultad FROM Física_prácticas_cepreuni"
-    )
+    async with await connect_db() as conn:
+        # Obtener preguntas aleatorias de la tabla física_prácticas_cepreuni
+        ejercicios = await conn.fetch(
+            'SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, tema, subtema, dificultad FROM "física_prácticas_cepreuni"'
+        )
     
     preguntas = random.sample(ejercicios, min(num_preguntas, len(ejercicios)))
-
-    await conn.close()
 
     # Construir la respuesta con las preguntas y alternativas
     preguntas_final = []
     for p in preguntas:
         preguntas_final.append({
-            "ejercicio": p["Ejercicio"],
-            "imagen": p["Imagen"],  # Puede ser NULL si no hay imagen
+            "ejercicio": p["ejercicio"],
+            "imagen": p["imagen"],  # Puede ser NULL si no hay imagen
             "alternativas": [
-                {"letra": "A", "texto": p["A"]},
-                {"letra": "B", "texto": p["B"]},
-                {"letra": "C", "texto": p["C"]},
-                {"letra": "D", "texto": p["D"]},
-                {"letra": "E", "texto": p["E"]},
+                {"letra": "A", "texto": p["a"]},
+                {"letra": "B", "texto": p["b"]},
+                {"letra": "C", "texto": p["c"]},
+                {"letra": "D", "texto": p["d"]},
+                {"letra": "E", "texto": p["e"]},
             ],
-            "respuesta_correcta": p["Alt_Correcta"],  # Letra de la alternativa correcta
-            "tema": p["Tema"],
-            "subtema": p["Subtema"],
-            "dificultad": p["Dificultad"]
+            "respuesta_correcta": p["alt_correcta"],  # Letra de la alternativa correcta
+            "tema": p["tema"],
+            "subtema": p["subtema"],
+            "dificultad": p["dificultad"]
         })
 
     return preguntas_final
@@ -52,17 +49,16 @@ class RespuestaInput(BaseModel):
 
 @app.post("/responder")
 async def responder(respuesta: RespuestaInput):
-    conn = await connect_db()
-    try:
-        await conn.execute(
-            "INSERT INTO respuestas (estudiante_id, ejercicio, alternativa_seleccionada) VALUES ($1, $2, $3)",
-            respuesta.estudiante_id, respuesta.ejercicio, respuesta.alternativa_seleccionada
-        )
-        return {"mensaje": "Respuesta guardada con éxito"}
-    except Exception as e:
-        return {"error": str(e)}
-    finally:
-        await conn.close()
+    async with await connect_db() as conn:
+        try:
+            await conn.execute(
+                'INSERT INTO respuestas (estudiante_id, ejercicio, alternativa_seleccionada) VALUES ($1, $2, $3)',
+                respuesta.estudiante_id, respuesta.ejercicio, respuesta.alternativa_seleccionada
+            )
+            return {"mensaje": "Respuesta guardada con éxito"}
+        except Exception as e:
+            return {"error": str(e)}
+
 
 from fastapi.middleware.cors import CORSMiddleware
 
