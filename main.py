@@ -18,32 +18,40 @@ async def connect_db():
         print(f"Error al conectar a la base de datos: {e}")
         return None
 
-@app.get("/simulacro/{num_preguntas}")
-async def get_simulacro(num_preguntas: int, temas: list[str] = Query(None, description="Lista de temas separados por comas")):
+@app.get("/temas")
+async def get_temas():
+    """ Devuelve una lista de los temas disponibles en la base de datos """
     try:
         conn = await connect_db()
         if conn is None:
             return {"error": "No se pudo conectar a la base de datos"}
 
-        try:
-            if temas:
-                query = '''
-                    SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, tema, subtema, dificultad
-                    FROM "física_prácticas_cepreuni"
-                    WHERE tema = ANY($1)
-                '''
-                ejercicios = await conn.fetch(query, temas)
-            else:
-                query = '''
-                    SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, tema, subtema, dificultad
-                    FROM "física_prácticas_cepreuni"
-                '''
-                ejercicios = await conn.fetch(query)
-        finally:
-            await conn.close()
+        temas = await conn.fetch('SELECT DISTINCT tema FROM "física_prácticas_cepreuni"')
+        await conn.close()
+        
+        return [t["tema"] for t in temas]
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/simulacro/")
+async def get_simulacro(num_preguntas: int = 1, temas: list[str] = Query([])):
+    """ Devuelve preguntas filtradas por los temas seleccionados """
+    try:
+        conn = await connect_db()
+        if conn is None:
+            return {"error": "No se pudo conectar a la base de datos"}
+
+        query = 'SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, tema, subtema, dificultad FROM "física_prácticas_cepreuni"'
+        
+        if temas:
+            temas_str = "', '".join(temas)
+            query += f" WHERE tema IN ('{temas_str}')"
+
+        ejercicios = await conn.fetch(query)
+        await conn.close()
 
         if not ejercicios:
-            return {"error": "No hay ejercicios en la base de datos"}
+            return {"error": "No hay ejercicios en la base de datos para los temas seleccionados"}
 
         preguntas = random.choices(ejercicios, k=min(num_preguntas, len(ejercicios)))
 
@@ -73,12 +81,12 @@ async def get_simulacro(num_preguntas: int, temas: list[str] = Query(None, descr
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  
+    allow_headers=["*"],  
 )
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8080))  
     uvicorn.run(app, host="0.0.0.0", port=port)
