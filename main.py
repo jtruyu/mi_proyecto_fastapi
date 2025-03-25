@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 import asyncpg
 import random
@@ -16,21 +16,31 @@ async def connect_db():
         return conn
     except Exception as e:
         print(f"Error al conectar a la base de datos: {e}")
-        return None  # Manejo explícito del error
+        return None
 
 @app.get("/simulacro/{num_preguntas}")
-async def get_simulacro(num_preguntas: int):
+async def get_simulacro(num_preguntas: int, temas: list[str] = Query(None, description="Lista de temas separados por comas")):
     try:
         conn = await connect_db()
         if conn is None:
             return {"error": "No se pudo conectar a la base de datos"}
 
         try:
-            ejercicios = await conn.fetch(
-                'SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, tema, subtema, dificultad FROM "física_prácticas_cepreuni"'
-            )
+            if temas:
+                query = '''
+                    SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, tema, subtema, dificultad
+                    FROM "física_prácticas_cepreuni"
+                    WHERE tema = ANY($1)
+                '''
+                ejercicios = await conn.fetch(query, temas)
+            else:
+                query = '''
+                    SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, tema, subtema, dificultad
+                    FROM "física_prácticas_cepreuni"
+                '''
+                ejercicios = await conn.fetch(query)
         finally:
-            await conn.close()  # Cierra la conexión correctamente
+            await conn.close()
 
         if not ejercicios:
             return {"error": "No hay ejercicios en la base de datos"}
@@ -63,12 +73,12 @@ async def get_simulacro(num_preguntas: int):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"],  
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))  
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
