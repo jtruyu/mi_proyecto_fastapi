@@ -35,7 +35,7 @@ async def get_temas():
 
 @app.get("/simulacro/")
 async def get_simulacro(num_preguntas: int = 1, temas: list[str] = Query([])):
-    """ Devuelve preguntas filtradas por los temas seleccionados """
+    """ Devuelve preguntas filtradas por los temas seleccionados sin repetir """
     try:
         conn = await connect_db()
         if conn is None:
@@ -53,7 +53,12 @@ async def get_simulacro(num_preguntas: int = 1, temas: list[str] = Query([])):
         if not ejercicios:
             return {"error": "No hay ejercicios en la base de datos para los temas seleccionados"}
 
-        preguntas = random.choices(ejercicios, k=min(num_preguntas, len(ejercicios)))
+        # Evitar preguntas repetidas
+        if len(ejercicios) < num_preguntas:
+            return {"error": "No hay suficientes preguntas para mostrar"}
+
+        # Elegir aleatoriamente las preguntas sin repetirse
+        preguntas = random.sample(ejercicios, num_preguntas)
 
         preguntas_final = [
             {
