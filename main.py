@@ -10,8 +10,6 @@ app = FastAPI()
 
 DATABASE_URL = "postgresql://postgres.cnvcwksnsbwafgesgdcn:Pacucha.13.@aws-0-sa-east-1.pooler.supabase.com:5432/postgres"
 
-preguntas_mostradas = {}  # Diccionario para almacenar las preguntas ya vistas por usuario
-
 async def connect_db():
     try:
         conn = await asyncpg.connect(DATABASE_URL)
@@ -20,9 +18,24 @@ async def connect_db():
         print(f"Error al conectar a la base de datos: {e}")
         return None
 
-@app.get("/siguiente_pregunta/{user_id}")
-async def siguiente_pregunta(user_id: str, temas: list[str] = Query([])):
-    """ Devuelve una nueva pregunta sin repetir dentro de una sesión del usuario """
+@app.get("/temas")
+async def get_temas():
+    """ Devuelve una lista de los temas disponibles en la base de datos """
+    try:
+        conn = await connect_db()
+        if conn is None:
+            return {"error": "No se pudo conectar a la base de datos"}
+
+        temas = await conn.fetch('SELECT DISTINCT tema FROM "física_prácticas_cepreuni"')
+        await conn.close()
+        
+        return [t["tema"] for t in temas]
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/simulacro/")
+async def get_simulacro(num_preguntas: int = 1, temas: list[str] = Query([])):
+    """ Devuelve preguntas filtradas por los temas seleccionados """
     try:
         conn = await connect_db()
         if conn is None:
@@ -40,37 +53,28 @@ async def siguiente_pregunta(user_id: str, temas: list[str] = Query([])):
         if not ejercicios:
             return {"error": "No hay ejercicios en la base de datos para los temas seleccionados"}
 
-        # Inicializar el historial si el usuario no existe en el diccionario
-        if user_id not in preguntas_mostradas:
-            preguntas_mostradas[user_id] = set()
+        preguntas = random.choices(ejercicios, k=min(num_preguntas, len(ejercicios)))
 
-        # Filtrar ejercicios no mostrados
-        preguntas_disponibles = [p for p in ejercicios if p["ejercicio"] not in preguntas_mostradas[user_id]]
+        preguntas_final = [
+            {
+                "ejercicio": p["ejercicio"],
+                "imagen": p["imagen"],
+                "alternativas": [
+                    {"letra": "A", "texto": p["a"]},
+                    {"letra": "B", "texto": p["b"]},
+                    {"letra": "C", "texto": p["c"]},
+                    {"letra": "D", "texto": p["d"]},
+                    {"letra": "E", "texto": p["e"]},
+                ],
+                "respuesta_correcta": p["alt_correcta"],
+                "tema": p["tema"],
+                "subtema": p["subtema"],
+                "dificultad": p["dificultad"]
+            }
+            for p in preguntas
+        ]
 
-        # Si ya se mostraron todas, resetear la lista
-        if not preguntas_disponibles:
-            preguntas_mostradas[user_id] = set()
-            preguntas_disponibles = ejercicios
-
-        # Seleccionar una pregunta al azar
-        pregunta = random.choice(preguntas_disponibles)
-        preguntas_mostradas[user_id].add(pregunta["ejercicio"])
-
-        return {
-            "ejercicio": pregunta["ejercicio"],
-            "imagen": pregunta["imagen"],
-            "alternativas": [
-                {"letra": "A", "texto": pregunta["a"]},
-                {"letra": "B", "texto": pregunta["b"]},
-                {"letra": "C", "texto": pregunta["c"]},
-                {"letra": "D", "texto": pregunta["d"]},
-                {"letra": "E", "texto": pregunta["e"]},
-            ],
-            "respuesta_correcta": pregunta["alt_correcta"],
-            "tema": pregunta["tema"],
-            "subtema": pregunta["subtema"],
-            "dificultad": pregunta["dificultad"]
-        }
+        return preguntas_final
 
     except Exception as e:
         return {"error": str(e)}
