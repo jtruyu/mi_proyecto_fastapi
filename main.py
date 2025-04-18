@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Body
 from pydantic import BaseModel
 import asyncpg
 import random
 import os
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime
 
 app = FastAPI()
 
@@ -17,6 +18,16 @@ async def connect_db():
     except Exception as e:
         print(f"Error al conectar a la base de datos: {e}")
         return None
+
+# Modelo para recibir los datos del usuario
+class Usuario(BaseModel):
+    nombre: str
+    correo: str
+    resultado: float
+    preguntas_correctas: int
+    preguntas_incorrectas: int
+    preguntas_sin_responder: int
+    tiempo_usado: int
 
 @app.get("/temas")
 async def get_temas():
@@ -34,7 +45,7 @@ async def get_temas():
         return {"error": str(e)}
 
 @app.get("/simulacro/")
-async def get_simulacro(num_preguntas: int = 1, temas: list[str] = Query([])):
+async def get_simulacro(num_preguntas: int = 10, temas: list[str] = Query([])):
     """ Devuelve preguntas filtradas por los temas seleccionados sin repetir """
     try:
         conn = await connect_db()
@@ -81,6 +92,51 @@ async def get_simulacro(num_preguntas: int = 1, temas: list[str] = Query([])):
 
         return preguntas_final
 
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/guardar-resultado")
+async def guardar_resultado(usuario: Usuario):
+    """Guarda los resultados del simulacro junto con la información del usuario"""
+    try:
+        conn = await connect_db()
+        if conn is None:
+            return {"error": "No se pudo conectar a la base de datos"}
+        
+        # Crear la tabla si no existe
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS resultados_simulacro (
+                id SERIAL PRIMARY KEY,
+                nombre TEXT,
+                correo TEXT,
+                resultado FLOAT,
+                preguntas_correctas INTEGER,
+                preguntas_incorrectas INTEGER,
+                preguntas_sin_responder INTEGER,
+                tiempo_usado INTEGER,
+                fecha_realizacion TIMESTAMP
+            )
+        ''')
+        
+        # Insertar los datos del resultado
+        await conn.execute('''
+            INSERT INTO resultados_simulacro
+            (nombre, correo, resultado, preguntas_correctas, preguntas_incorrectas, preguntas_sin_responder, tiempo_usado, fecha_realizacion)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ''', 
+        usuario.nombre, 
+        usuario.correo, 
+        usuario.resultado, 
+        usuario.preguntas_correctas, 
+        usuario.preguntas_incorrectas,
+        usuario.preguntas_sin_responder,
+        usuario.tiempo_usado,
+        datetime.now()
+        )
+        
+        await conn.close()
+        return {"status": "success", "message": "Resultado guardado correctamente"}
+    
     except Exception as e:
         return {"error": str(e)}
 
