@@ -130,7 +130,7 @@ async def get_simulacro():
         return {"error": str(e)}
 
 @app.post("/guardar-diagnostico")
-async def guardar_resultado(usuario: Usuario):
+async def guardar_diagnostico(usuario: Usuario):
     """Guarda los resultados del diagnóstico junto con la información del usuario"""
     try:
         conn = await connect_db()
