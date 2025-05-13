@@ -84,49 +84,39 @@ async def get_diagnostico():
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/simulacro/")
-async def get_simulacro():
-    """ Devuelve todos los ejercicios del primer simulacro """
+@app.post("/guardar-simulacro")
+async def guardar_simulacro(usuario: SimulacroUsuario):
+    """Guarda los resultados del simulacro junto con la información del usuario"""
     try:
+        print("Datos recibidos para simulacro:", usuario.dict())
+        
         conn = await connect_db()
         if conn is None:
             return {"error": "No se pudo conectar a la base de datos"}
-
-        orden_cursos = ["RM", "RV", "Aritmética", "Algebra", "Geometría", "Trigonometría", "Física", "Química"]
         
-        ejercicios = await conn.fetch('SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, curso, tema, dificultad FROM "primer_simulacro"')
-        await conn.close()
-
-        if not ejercicios:
-            return {"error": "No hay ejercicios en la base de datos"}
-
-        ejercicios_ordenados = sorted(
-            ejercicios, 
-            key=lambda x: orden_cursos.index(x["curso"]) if x["curso"] in orden_cursos else 999
+        # Eliminar el CREATE TABLE IF NOT EXISTS y manejar las respuestas directamente
+        await conn.execute('''
+            INSERT INTO resultados_simulacro
+            (nombre, correo, resultado, preguntas_correctas, preguntas_incorrectas, 
+             preguntas_sin_responder, tiempo_usado, respuestas, fecha_realizacion)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+        ''', 
+        usuario.nombre, 
+        usuario.correo, 
+        usuario.resultado, 
+        usuario.preguntas_correctas, 
+        usuario.preguntas_incorrectas,
+        usuario.preguntas_sin_responder,
+        usuario.tiempo_usado,
+        usuario.respuestas,  # Usar directamente el string JSON
+        datetime.now()
         )
-
-        preguntas_final = [
-            {
-                "ejercicio": p["ejercicio"],
-                "imagen": p["imagen"],
-                "alternativas": [
-                    {"letra": "A", "texto": p["a"]},
-                    {"letra": "B", "texto": p["b"]},
-                    {"letra": "C", "texto": p["c"]},
-                    {"letra": "D", "texto": p["d"]},
-                    {"letra": "E", "texto": p["e"]},
-                ],
-                "respuesta_correcta": p["alt_correcta"],
-                "curso": p["curso"],
-                "tema": p["tema"],
-                "dificultad": p["dificultad"]
-            }
-            for p in ejercicios_ordenados
-        ]
-
-        return preguntas_final
-
+        
+        await conn.close()
+        return {"status": "success", "message": "Resultado de simulacro guardado correctamente"}
+    
     except Exception as e:
+        print(f"Error en guardar-simulacro: {str(e)}")
         return {"error": str(e)}
 
 @app.post("/guardar-diagnostico")
