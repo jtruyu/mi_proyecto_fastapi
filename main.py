@@ -38,8 +38,8 @@ class SimulacroUsuario(BaseModel):
     tiempo_usado: int
     respuestas: str
 
-@app.get("/simulacro/")
-async def get_simulacro():
+@app.get("/diagnostico/")
+async def get_diagnostico():
     """ Devuelve todos los ejercicios de la tabla ejercicios_admision ordenados por curso """
     try:
         conn = await connect_db()
@@ -84,8 +84,8 @@ async def get_simulacro():
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/primer-simulacro/")
-async def get_primer_simulacro():
+@app.get("/simulacro/")
+async def get_simulacro():
     """ Devuelve todos los ejercicios del primer simulacro """
     try:
         conn = await connect_db()
@@ -129,7 +129,7 @@ async def get_primer_simulacro():
     except Exception as e:
         return {"error": str(e)}
 
-@app.post("/guardar-resultado")
+@app.post("/guardar-diagnostico")
 async def guardar_resultado(usuario: Usuario):
     """Guarda los resultados del diagnóstico junto con la información del usuario"""
     try:
