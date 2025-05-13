@@ -19,7 +19,6 @@ async def connect_db():
         print(f"Error al conectar a la base de datos: {e}")
         return None
 
-# Modelo para recibir los datos del usuario (diagnóstico)
 class Usuario(BaseModel):
     nombre: str
     correo: str
@@ -29,7 +28,6 @@ class Usuario(BaseModel):
     preguntas_sin_responder: int
     tiempo_usado: int
 
-# Modelo para recibir los datos del simulacro
 class SimulacroUsuario(BaseModel):
     nombre: str
     correo: str
@@ -48,17 +46,14 @@ async def get_simulacro():
         if conn is None:
             return {"error": "No se pudo conectar a la base de datos"}
 
-        # Definir el orden específico de los cursos
         orden_cursos = ["RM", "Aritmética", "Algebra", "Geometría", "Trigonometría", "Física", "Química"]
         
-        # Consulta para obtener todos los ejercicios
         ejercicios = await conn.fetch('SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, curso, tema, dificultad, ciclo FROM "ejercicios_admision"')
         await conn.close()
 
         if not ejercicios:
             return {"error": "No hay ejercicios en la base de datos"}
 
-        # Ordenar los ejercicios según el orden de cursos definido
         ejercicios_ordenados = sorted(
             ejercicios, 
             key=lambda x: orden_cursos.index(x["curso"]) if x["curso"] in orden_cursos else 999
@@ -97,17 +92,14 @@ async def get_primer_simulacro():
         if conn is None:
             return {"error": "No se pudo conectar a la base de datos"}
 
-        # Definir el orden específico de los cursos
         orden_cursos = ["RM", "RV", "Aritmética", "Algebra", "Geometría", "Trigonometría", "Física", "Química"]
         
-        # Consulta para obtener todos los ejercicios del primer simulacro
         ejercicios = await conn.fetch('SELECT ejercicio, imagen, a, b, c, d, e, alt_correcta, curso, tema, dificultad FROM "primer_simulacro"')
         await conn.close()
 
         if not ejercicios:
             return {"error": "No hay ejercicios en la base de datos"}
 
-        # Ordenar los ejercicios según el orden de cursos definido
         ejercicios_ordenados = sorted(
             ejercicios, 
             key=lambda x: orden_cursos.index(x["curso"]) if x["curso"] in orden_cursos else 999
@@ -145,7 +137,6 @@ async def guardar_resultado(usuario: Usuario):
         if conn is None:
             return {"error": "No se pudo conectar a la base de datos"}
         
-        # Insertar los datos del resultado
         await conn.execute('''
             INSERT INTO resultados_diagnostico
             (nombre, correo, resultado, preguntas_correctas, preguntas_incorrectas, preguntas_sin_responder, tiempo_usado, fecha_realizacion)
@@ -171,11 +162,18 @@ async def guardar_resultado(usuario: Usuario):
 async def guardar_simulacro(usuario: SimulacroUsuario):
     """Guarda los resultados del simulacro junto con la información del usuario"""
     try:
+        print("Datos recibidos para simulacro:", usuario.dict())
+        
         conn = await connect_db()
         if conn is None:
             return {"error": "No se pudo conectar a la base de datos"}
         
-        # Crear la tabla si no existe
+        try:
+            respuestas_json = json.loads(usuario.respuestas)
+        except json.JSONDecodeError as je:
+            print(f"Error al parsear respuestas: {je}")
+            return {"error": "Formato de respuestas inválido"}
+        
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS resultados_simulacro (
                 id SERIAL PRIMARY KEY,
@@ -191,10 +189,10 @@ async def guardar_simulacro(usuario: SimulacroUsuario):
             )
         ''')
         
-        # Insertar los datos del resultado
         await conn.execute('''
             INSERT INTO resultados_simulacro
-            (nombre, correo, resultado, preguntas_correctas, preguntas_incorrectas, preguntas_sin_responder, tiempo_usado, respuestas, fecha_realizacion)
+            (nombre, correo, resultado, preguntas_correctas, preguntas_incorrectas, 
+             preguntas_sin_responder, tiempo_usado, respuestas, fecha_realizacion)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ''', 
         usuario.nombre, 
@@ -204,7 +202,7 @@ async def guardar_simulacro(usuario: SimulacroUsuario):
         usuario.preguntas_incorrectas,
         usuario.preguntas_sin_responder,
         usuario.tiempo_usado,
-        json.loads(usuario.respuestas),
+        respuestas_json,
         datetime.now()
         )
         
@@ -212,6 +210,7 @@ async def guardar_simulacro(usuario: SimulacroUsuario):
         return {"status": "success", "message": "Resultado de simulacro guardado correctamente"}
     
     except Exception as e:
+        print(f"Error en guardar-simulacro: {str(e)}")
         return {"error": str(e)}
 
 app.add_middleware(
