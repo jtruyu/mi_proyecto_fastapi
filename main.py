@@ -147,7 +147,7 @@ async def guardar_resultado(usuario: Usuario):
         
         # Insertar los datos del resultado
         await conn.execute('''
-            INSERT INTO resultados_simulacro
+            INSERT INTO resultados_diagnostico
             (nombre, correo, resultado, preguntas_correctas, preguntas_incorrectas, preguntas_sin_responder, tiempo_usado, fecha_realizacion)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ''', 
@@ -177,7 +177,7 @@ async def guardar_simulacro(usuario: SimulacroUsuario):
         
         # Crear la tabla si no existe
         await conn.execute('''
-            CREATE TABLE IF NOT EXISTS resultados_simulacro_completo (
+            CREATE TABLE IF NOT EXISTS resultados_simulacro (
                 id SERIAL PRIMARY KEY,
                 nombre TEXT,
                 correo TEXT,
@@ -193,7 +193,7 @@ async def guardar_simulacro(usuario: SimulacroUsuario):
         
         # Insertar los datos del resultado
         await conn.execute('''
-            INSERT INTO resultados_simulacro_completo
+            INSERT INTO resultados_simulacro
             (nombre, correo, resultado, preguntas_correctas, preguntas_incorrectas, preguntas_sin_responder, tiempo_usado, respuestas, fecha_realizacion)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ''', 
